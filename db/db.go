@@ -45,7 +45,11 @@ func Conn() (*Storage, error) {
 
 // Users returns the users collection from MongoDB.
 func (s *Storage) Users() *storage.Collection {
-	emailIndex := mgo.Index{Key: []string{"email"}, Unique: true}
+	emailIndex := mgo.Index{
+		Key:        []string{"email"},
+		Unique:     true,
+		Background: true,
+	}
 	c := s.Collection("users")
 	c.EnsureIndex(emailIndex)
 	return c
