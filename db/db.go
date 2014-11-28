@@ -1,118 +1,52 @@
 package db
 
 import (
-	"sync"
-	"time"
+	"log"
+	"os"
 
+	"github.com/dbongo/app/db/storage"
 	"gopkg.in/mgo.v2"
 )
 
-var (
-	conn   = make(map[string]*session) // pool of connections
-	mut    sync.RWMutex                // for pool thread safety
-	ticker *time.Ticker                // for garbage collection
+const (
+	// DefaultDBURL ...
+	DefaultDBURL = "127.0.0.1:27017"
+	// DefaultDBName ...
+	DefaultDBName = "appdb"
 )
 
-type session struct {
-	s    *mgo.Session
-	used time.Time
-}
-
-const period time.Duration = 7 * 24 * time.Hour
-
-// Storage holds the connection with the database.
+// Storage ...
 type Storage struct {
-	session *mgo.Session
-	dbname  string
+	*storage.Storage
 }
 
-// Collection represents a database collection. It embeds mgo.Collection for operations, and holds a session to MongoDB.
-// The user may close the session using the method close.
-type Collection struct {
-	*mgo.Collection
-}
-
-// Close closes the session with the database.
-func (c *Collection) Close() {
-	c.Collection.Database.Session.Close()
-}
-
-func open(addr, dbname string) (*Storage, error) {
-	sess, err := mgo.Dial(addr)
-	if err != nil {
-		return nil, err
+func conn() (*storage.Storage, error) {
+	url := os.Getenv("MONGO_ADDRESS")
+	if url == "" {
+		url = DefaultDBURL
 	}
-	copy := sess.Clone()
-	storage := &Storage{session: copy, dbname: dbname}
-	mut.Lock()
-	conn[addr] = &session{s: sess, used: time.Now()}
-	mut.Unlock()
-	return storage, nil
-}
-
-// Open dials to the MongoDB database, and return the connection (represented by the type Storage).
-// addr is a MongoDB connection URI, and dbname is the name of the database.
-// This function returns a pointer to a Storage, or a non-nil error in case of any failure.
-func Open(addr, dbname string) (storage *Storage, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			storage, err = open(addr, dbname)
-		}
-	}()
-	mut.RLock()
-	if session, ok := conn[addr]; ok {
-		mut.RUnlock()
-		if err = session.s.Ping(); err == nil {
-			mut.Lock()
-			session.used = time.Now()
-			conn[addr] = session
-			mut.Unlock()
-			copy := session.s.Clone()
-			return &Storage{copy, dbname}, nil
-		}
-		return open(addr, dbname)
+	name := os.Getenv("MONGO_DATABASE")
+	if name == "" {
+		name = DefaultDBName
 	}
-	mut.RUnlock()
-	return open(addr, dbname)
+	log.Printf("db connected to %s at %s", name, url)
+	return storage.Open(url, name)
 }
 
-// Close closes the storage, releasing the connection.
-func (s *Storage) Close() {
-	s.session.Close()
+// Conn ...
+func Conn() (*Storage, error) {
+	var (
+		strg Storage
+		err  error
+	)
+	strg.Storage, err = conn()
+	return &strg, err
 }
 
-// Collection returns a collection by its name. If the collection does not exist, MongoDB will create it.
-func (s *Storage) Collection(name string) *Collection {
-	return &Collection{s.session.DB(s.dbname).C(name)}
-}
-
-// DB ...
-func (s *Storage) DB() *mgo.Database {
-	return s.session.DB(s.dbname)
-}
-
-func init() {
-	ticker = time.NewTicker(time.Hour)
-	go retire(ticker)
-}
-
-// retire retires old connections
-func retire(t *time.Ticker) {
-	for _ = range t.C {
-		now := time.Now()
-		var old []string
-		mut.RLock()
-		for k, v := range conn {
-			if now.Sub(v.used) >= period {
-				old = append(old, k)
-			}
-		}
-		mut.RUnlock()
-		mut.Lock()
-		for _, c := range old {
-			conn[c].s.Close()
-			delete(conn, c)
-		}
-		mut.Unlock()
-	}
+// Users returns the users collection from MongoDB.
+func (s *Storage) Users() *storage.Collection {
+	emailIndex := mgo.Index{Key: []string{"email"}, Unique: true}
+	c := s.Collection("users")
+	c.EnsureIndex(emailIndex)
+	return c
 }
