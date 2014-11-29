@@ -6,7 +6,6 @@ import (
 	"code.google.com/p/go.crypto/bcrypt"
 
 	"github.com/dbongo/app/db"
-	"github.com/mholt/binding"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -17,24 +16,6 @@ type User struct {
 	Password      string        `bson:"password,omitempty" json:"-"`
 	Email         string        `bson:"email,omitempty" json:"email,omitempty"`
 	VerifiedEmail bool          `bson:"mailV,omitempty" json:"verifiedEmail,omitempty"`
-}
-
-// FieldMap ...
-func (u *User) FieldMap() binding.FieldMap {
-	return binding.FieldMap{
-		&u.Email: binding.Field{
-			Form:     "email",
-			Required: true,
-		},
-		&u.Username: binding.Field{
-			Form:     "username",
-			Required: true,
-		},
-		&u.Password: binding.Field{
-			Form:     "password",
-			Required: true,
-		},
-	}
 }
 
 // AuthUser ...

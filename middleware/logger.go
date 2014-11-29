@@ -24,8 +24,8 @@ func (w *StatusResponseWriter) WriteHeader(status int) {
 func Logger(c *web.C, h http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		sw := &StatusResponseWriter{w, http.StatusOK}
-		h.ServeHTTP(sw, r)
+		srw := &StatusResponseWriter{w, http.StatusOK}
+		h.ServeHTTP(srw, r)
 		var remoteAddr string
 		fwd := r.Header.Get("X-Forwarded-For")
 		if fwd == "" {
@@ -33,7 +33,13 @@ func Logger(c *web.C, h http.Handler) http.Handler {
 		} else {
 			remoteAddr = fwd + ":" + r.Header.Get("X-Forwarded-Port")
 		}
-		log.Printf("%s %6.4fms %s %d %s\n", remoteAddr, float64(time.Since(start))/float64(time.Millisecond), r.Method, sw.Status, r.RequestURI)
+		log.Printf("%s %6.4fms %s %d %s\n",
+			remoteAddr,
+			float64(time.Since(start))/float64(time.Millisecond),
+			r.Method,
+			srw.Status,
+			r.RequestURI,
+		)
 	}
 	return http.HandlerFunc(fn)
 }

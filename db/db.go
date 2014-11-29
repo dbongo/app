@@ -9,10 +9,8 @@ import (
 )
 
 const (
-	// DefaultDBURL ...
-	DefaultDBURL = "127.0.0.1:27017"
-	// DefaultDBName ...
-	DefaultDBName = "appdb"
+	defaultURL  = "127.0.0.1:27017"
+	defaultName = "appdb"
 )
 
 // Storage ...
@@ -23,11 +21,11 @@ type Storage struct {
 func conn() (*storage.Storage, error) {
 	url := os.Getenv("MONGO_ADDRESS")
 	if url == "" {
-		url = DefaultDBURL
+		url = defaultURL
 	}
 	name := os.Getenv("MONGO_DATABASE")
 	if name == "" {
-		name = DefaultDBName
+		name = defaultName
 	}
 	log.Printf("db connected to %s at %s", name, url)
 	return storage.Open(url, name)
